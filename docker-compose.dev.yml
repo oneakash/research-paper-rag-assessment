@@ -1,0 +1,60 @@
+# docker-compose.dev.yml
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: research_papers_dev
+      POSTGRES_USER: dev_user
+      POSTGRES_PASSWORD: dev_password
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    restart: unless-stopped
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_dev_data:/qdrant/storage
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  # Development app with hot reload
+  rag-app-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://dev_user:dev_password@postgres:5432/research_papers_dev
+      QDRANT_HOST: qdrant
+      QDRANT_PORT: 6333
+      REDIS_URL: redis://redis:6379/0
+      EMBEDDING_MODEL_NAME: all-MiniLM-L6-v2
+      DEBUG: "true"
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+    volumes:
+      - ./src:/app/src # Hot reload
+      - ./uploads:/app/uploads
+      - ./papers:/app/papers
+      - ./logs:/app/logs
+    depends_on:
+      - postgres
+      - qdrant
+      - redis
+    restart: unless-stopped
+
+volumes:
+  postgres_dev_data:
+  qdrant_dev_data:
